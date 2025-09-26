@@ -37,19 +37,16 @@ body {
   }
 }
 
-/* Buttons/badges: fixed height + centered text */
 .badge {
   @apply inline-flex h-9 items-center text-xs font-medium px-2.5 rounded-md
          text-neutral-100/95 border border-white/20 bg-neutral-900/80;
 }
 
-/* Panels: darker glass with stronger contrast */
 .panel {
   @apply rounded-2xl border border-white/20 bg-neutral-900/80
-         shadow-glow backdrop-blur-md;
+         shadow-glow backdrop-blur-md max-w-full overflow-hidden;
 }
 
-/* Slider normalization for perfect vertical alignment */
 .range {
   @apply align-middle w-64 h-3 appearance-none bg-white/15 rounded-full outline-none;
 }
@@ -57,7 +54,6 @@ body {
   @apply outline-none;
 }
 
-/* webkit */
 .range::-webkit-slider-runnable-track {
   @apply h-3 rounded-full bg-white/15;
 }
@@ -67,7 +63,6 @@ body {
   margin-top: -5px;
 }
 
-/* firefox */
 .range::-moz-range-track {
   @apply h-3 rounded-full bg-white/15;
 }
@@ -76,7 +71,6 @@ body {
   border: none;
 }
 
-/* legacy ms/edge (harmless elsewhere) */
 .range::-ms-track {
   @apply h-3 bg-transparent border-0 text-transparent;
 }
@@ -86,4 +80,8 @@ body {
 }
 .range::-ms-thumb {
   @apply h-4 w-4 rounded-full bg-white shadow;
+}
+
+.input {
+  @apply h-9 px-3 rounded-md border border-white/20 bg-neutral-900/80 text-sm text-neutral-100;
 }
