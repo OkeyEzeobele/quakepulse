@@ -26,24 +26,23 @@ export default function Controls({
 }) {
   return (
     <div className="panel px-4 py-3">
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={() => setWindowKey("hour")}
-            className={clsx("badge", windowKey === "hour" && "bg-white/10")}
+            className={clsx("badge", windowKey === "hour" && "bg-white/20")}
           >
             Last 1h
           </button>
           <button
             onClick={() => setWindowKey("day")}
-            className={clsx("badge", windowKey === "day" && "bg-white/10")}
+            className={clsx("badge", windowKey === "day" && "bg-white/20")}
           >
             Last 24h
           </button>
         </div>
-
-        <div className="flex items-center gap-2">
-          <span className="text-xs opacity-80 w-16">
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-xs opacity-80 whitespace-nowrap">
             Mag ≥ {magMin.toFixed(1)}
           </span>
           <input
@@ -53,27 +52,27 @@ export default function Controls({
             step="0.1"
             value={magMin}
             onChange={(e) => setMagMin(parseFloat(e.target.value))}
-            className="w-48 accent-white"
+            className="range"
           />
         </div>
-
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-1 min-w-[320px]">
           <button
             onClick={() => setLive(true)}
-            className={clsx("badge", live && "bg-white/10")}
+            className={clsx("badge", live && "bg-white/20")}
           >
             Live
           </button>
           <button
             onClick={() => setLive(false)}
-            className={clsx("badge", !live && "bg-white/10")}
+            className={clsx("badge", !live && "bg-white/20")}
           >
             Replay
           </button>
+
           <div
             className={clsx(
               "flex items-center gap-2",
-              live ? "opacity-40 pointer-events-none" : ""
+              live && "opacity-40 pointer-events-none"
             )}
           >
             <input
@@ -83,24 +82,25 @@ export default function Controls({
               step="1"
               value={scrubPct}
               onChange={(e) => setScrubPct(parseInt(e.target.value))}
-              className="w-64 accent-white"
+              className="range w-[28rem] max-w-[40vw]"
             />
-            <span className="text-xs opacity-80 w-40">
+            <span
+              className="text-xs opacity-80 whitespace-nowrap"
+              suppressHydrationWarning
+            >
               {formatRangeLabel(now, scrubPct)}
             </span>
           </div>
         </div>
-
-        <div className="flex items-center gap-2">
+        <div className="shrink-0">
           <button
             onClick={() => setTourOn((v) => !v)}
-            className={clsx("badge", tourOn && "bg-white/10")}
+            className={clsx("badge", tourOn && "bg-white/20")}
           >
             {tourOn ? "Stop Tour" : "Play Tour"}
           </button>
         </div>
-
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-2 flex items-center gap-2 shrink-0">
           {presets.map((p) => (
             <button
               key={p.name}

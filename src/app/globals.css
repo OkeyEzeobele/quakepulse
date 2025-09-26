@@ -37,16 +37,53 @@ body {
   }
 }
 
+/* Buttons/badges: fixed height + centered text */
 .badge {
-  @apply text-xs font-medium px-2.5 py-1.5 rounded-md
-         text-neutral-100/95
-         border border-white/20
-         bg-neutral-900/70;
+  @apply inline-flex h-9 items-center text-xs font-medium px-2.5 rounded-md
+         text-neutral-100/95 border border-white/20 bg-neutral-900/80;
 }
 
+/* Panels: darker glass with stronger contrast */
 .panel {
-  @apply rounded-2xl
-         border border-white/20
-         bg-neutral-900/80
+  @apply rounded-2xl border border-white/20 bg-neutral-900/80
          shadow-glow backdrop-blur-md;
+}
+
+/* Slider normalization for perfect vertical alignment */
+.range {
+  @apply align-middle w-64 h-3 appearance-none bg-white/15 rounded-full outline-none;
+}
+.range:focus {
+  @apply outline-none;
+}
+
+/* webkit */
+.range::-webkit-slider-runnable-track {
+  @apply h-3 rounded-full bg-white/15;
+}
+.range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  @apply h-4 w-4 rounded-full bg-white shadow;
+  margin-top: -5px;
+}
+
+/* firefox */
+.range::-moz-range-track {
+  @apply h-3 rounded-full bg-white/15;
+}
+.range::-moz-range-thumb {
+  @apply h-4 w-4 rounded-full bg-white shadow;
+  border: none;
+}
+
+/* legacy ms/edge (harmless elsewhere) */
+.range::-ms-track {
+  @apply h-3 bg-transparent border-0 text-transparent;
+}
+.range::-ms-fill-lower,
+.range::-ms-fill-upper {
+  @apply bg-white/15;
+}
+.range::-ms-thumb {
+  @apply h-4 w-4 rounded-full bg-white shadow;
 }
