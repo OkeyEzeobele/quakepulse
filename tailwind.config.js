@@ -1,5 +1,15 @@
 /** @type {import('tailwindcss').Config} */
-export default {
+module.exports = {
+  content: [
+    "./app/**/*.{js,jsx,ts,tsx}",
+    "./src/app/**/*.{js,jsx,ts,tsx}",
+    "./components/**/*.{js,jsx,ts,tsx}",
+    "./src/components/**/*.{js,jsx,ts,tsx}",
+    "./lib/**/*.{js,jsx,ts,tsx}",
+    "./src/lib/**/*.{js,jsx,ts,tsx}",
+    "./hooks/**/*.{js,jsx,ts,tsx}",
+    "./src/hooks/**/*.{js,jsx,ts,tsx}"
+  ],
   theme: {
     extend: {
       boxShadow: {
@@ -8,4 +18,4 @@ export default {
     }
   },
   plugins: []
-}
+};
