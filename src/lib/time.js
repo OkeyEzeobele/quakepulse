@@ -1,4 +1,3 @@
-// Force consistent 24h clock everywhere
 const CLOCK_FMT = new Intl.DateTimeFormat("en-GB", {
   hour: "2-digit",
   minute: "2-digit",

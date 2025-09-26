@@ -107,7 +107,7 @@ export default function Page() {
 
   return (
     <div className="h-screen w-screen overflow-hidden">
-      <div className="absolute inset-0">
+      <div className="absolute inset-0 z-0">
         <QuakeMap
           quakes={displayed}
           flyTo={flyTo}
