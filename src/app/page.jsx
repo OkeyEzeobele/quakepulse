@@ -16,51 +16,44 @@ const QuakeMap = dynamic(() => import("@/components/QuakeMap"), { ssr: false });
 function PageInner() {
   const { toast } = useToast();
 
-  // hazard + time-mode
-  const [hazard, setHazard] = useState("earthquakes"); // "earthquakes" | "floods"
-  const [mode, setMode] = useState("live"); // "live" | "historyDay" | "customRange"
+  const [hazard, setHazard] = useState("earthquakes");
+  const [mode, setMode] = useState("live");
 
-  // controls
-  const [windowKey, setWindowKey] = useState("day"); // hour/day for live EQ
+  const [windowKey, setWindowKey] = useState("day");
   const [historyDate, setHistoryDate] = useState("");
   const [startISO, setStartISO] = useState("");
   const [endISO, setEndISO] = useState("");
   const [rangeError, setRangeError] = useState("");
 
-  // datasets
   const [magMin, setMagMin] = useState(0);
   const [quakes, setQuakes] = useState([]);
   const [floods, setFloods] = useState([]);
 
-  // UI selection / camera
   const [selected, setSelected] = useState(null);
   const [flyTo, setFlyTo] = useState(null);
 
-  // replay
   const [live, setLive] = useState(true);
   const [scrubPct, setScrubPct] = useState(100);
 
-  // header info
   const [mountedTime, setMountedTime] = useState(null);
 
-  // FX state
   const [fxShow, setFxShow] = useState(false);
-  const [fxKind, setFxKind] = useState("none"); // "earthquake" | "rain" | "none"
+  const [fxKind, setFxKind] = useState("none");
   const [fxDur, setFxDur] = useState(1200);
   const [fxIntensity, setFxIntensity] = useState(1);
-  const [fxTick, setFxTick] = useState(0); // <— used to force FX remount per step
+  const [fxTick, setFxTick] = useState(0);
 
-  // tour state
   const [tourOn, setTourOn] = useState(false);
 
-  // refs
   const seenRef = useRef(new Set());
   const userMovedRef = useRef(false);
   const tourTokenRef = useRef(0);
 
-  // helpers
   const isFlood = hazard === "floods";
   const isQuake = hazard === "earthquakes";
+
+  const DEFAULT_VIEW = { center: [20, 0], zoom: 2 };
+  const resetToDefaultView = () => setFlyTo(DEFAULT_VIEW);
 
   useEffect(() => {
     setMountedTime(new Date());
@@ -68,21 +61,18 @@ function PageInner() {
     return () => clearInterval(id);
   }, []);
 
-  // Start at neutral world view
   useEffect(() => {
-    setFlyTo({ center: [20, 0], zoom: 2 });
+    resetToDefaultView();
   }, []);
 
-  // on hazard change: reset state, stop tour
   useEffect(() => {
     setSelected(null);
     setTourOn(false);
     userMovedRef.current = false;
     if (isFlood) setQuakes([]);
     else setFloods([]);
-  }, [hazard]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [hazard]);
 
-  // any major control change stops tour
   useEffect(() => {
     setTourOn(false);
   }, [mode, historyDate, startISO, endISO, windowKey, magMin]);
@@ -105,7 +95,7 @@ function PageInner() {
   const { rangeStart, rangeEnd, rangeValidMs } = useMemo(() => {
     let s, e;
     if (mode === "live") {
-      s = new Date(now - (isQuake ? liveWindowMs : 86400e3));
+      s = new Date(now - (isQuake ? liveWindowMs : 30 * 86400e3));
       e = new Date(now);
     } else if (mode === "historyDay") {
       const d = historyDate || "1970-01-01";
@@ -119,7 +109,6 @@ function PageInner() {
     return { rangeStart: s, rangeEnd: e, rangeValidMs: ms };
   }, [mode, isQuake, historyDate, startISO, endISO, now, liveWindowMs]);
 
-  // validate custom range
   useEffect(() => {
     if (mode !== "customRange") {
       setRangeError("");
@@ -147,10 +136,6 @@ function PageInner() {
     return live ? endMs : startMs + (scrubPct / 100) * (endMs - startMs);
   }, [live, scrubPct, rangeStart, rangeEnd, now]);
 
-  /* -------------------------
-     DATA: Earthquakes
-  --------------------------*/
-  // Live polling
   useEffect(() => {
     let cancel = false;
     let timer;
@@ -202,9 +187,8 @@ function PageInner() {
       cancel = true;
       if (timer) clearTimeout(timer);
     };
-  }, [isQuake, mode, windowKey]);
+  }, [isQuake, mode, windowKey, toast]);
 
-  // History/custom
   useEffect(() => {
     let cancel = false;
     async function loadEQRange() {
@@ -272,11 +256,8 @@ function PageInner() {
     return () => {
       cancel = true;
     };
-  }, [isQuake, mode, historyDate, rangeStart, rangeEnd, rangeError]);
+  }, [isQuake, mode, historyDate, rangeStart, rangeEnd, rangeError, toast]);
 
-  /* -------------------------
-     DATA: Floods
-  --------------------------*/
   useEffect(() => {
     let cancel = false;
     let timer;
@@ -284,7 +265,6 @@ function PageInner() {
     function computeWindow() {
       const nowLocal = new Date();
       let s, e;
-
       if (mode === "historyDay" && historyDate) {
         s = new Date(`${historyDate}T00:00:00.000Z`);
         e = new Date(`${historyDate}T23:59:59.999Z`);
@@ -295,25 +275,15 @@ function PageInner() {
         s = new Date(nowLocal.getTime() - 30 * 86400e3);
         e = nowLocal;
       }
-      const queryFrom = new Date(s.getTime() - 1 * 86400e3);
-      const queryTo = new Date(e.getTime() + 0 * 86400e3);
-
+      const queryFrom = new Date(s.getTime() - 86400e3);
+      const queryTo = new Date(e.getTime());
       return { s, e, queryFrom, queryTo };
     }
 
     async function loadFloodsOnce() {
       if (!isFlood) return;
-      const { s, e, queryFrom, queryTo } = computeWindow();
+      const { queryFrom, queryTo } = computeWindow();
       try {
-        const now = new Date();
-        const thirtyDaysAgo = new Date(now.getTime() - 30 * 86400e3);
-        const queryFrom = new Date(
-          thirtyDaysAgo.getFullYear(),
-          thirtyDaysAgo.getMonth(),
-          thirtyDaysAgo.getDate()
-        );
-        const queryTo = now;
-
         const data = await fetchFloods({
           fromISO: queryFrom.toISOString(),
           toISO: queryTo.toISOString(),
@@ -322,7 +292,6 @@ function PageInner() {
         });
         if (cancel) return;
 
-        // Helpers
         function inferLevel(p) {
           const iconOverall =
             typeof p.iconoverall === "string" ? p.iconoverall : "";
@@ -385,13 +354,6 @@ function PageInner() {
           .filter(Boolean);
 
         setFloods(items);
-
-        console.log(
-          "[floods] fetched:",
-          data?.features?.length ?? 0,
-          "mapped:",
-          items.length
-        );
       } catch (e) {
         if (!cancel)
           toast({
@@ -421,11 +383,8 @@ function PageInner() {
       cancel = true;
       if (timer) clearTimeout(timer);
     };
-  }, [isFlood, mode, historyDate, startISO, endISO]);
+  }, [isFlood, mode, historyDate, startISO, endISO, toast]);
 
-  /* -------------------------
-     Derived lists + KPIs
-  --------------------------*/
   const tmin = rangeStart?.getTime?.() ?? null;
   const tmax = replayTs;
 
@@ -437,9 +396,17 @@ function PageInner() {
   }, [isQuake, quakes, magMin, tmin, rangeEnd, tmax]);
 
   const displayedFloods = useMemo(() => {
-    if (!isFlood || !tmin || !rangeEnd) return [];
-    return floods.filter((f) => f.time >= tmin && f.time <= tmax);
-  }, [isFlood, floods, tmin, rangeEnd, tmax]);
+    if (!isFlood) return [];
+    if (mode === "live") return floods;
+    if (!rangeStart || !rangeEnd) return floods;
+    const a0 = rangeStart.getTime();
+    const a1 = tmax;
+    return floods.filter((f) => {
+      const s = Number.isFinite(f.start) ? f.start : f.time;
+      const e = Number.isFinite(f.end) ? f.end : f.time;
+      return s <= a1 && e >= a0;
+    });
+  }, [isFlood, floods, mode, rangeStart, rangeEnd, tmax]);
 
   const kpi = useMemo(() => {
     if (!isQuake) return { countHour: 0, maxMag: 0, avgMag: 0 };
@@ -454,9 +421,21 @@ function PageInner() {
     return { countHour, maxMag, avgMag };
   }, [isQuake, displayedQuakes, now, rangeEnd]);
 
-  /* -------------------------
-     TOUR
-  --------------------------*/
+  const floodKpi = useMemo(() => {
+    const nowMs = Date.now();
+    const startMs = nowMs - 30 * 86400e3;
+    const within = floods.filter((f) => {
+      const s = Number.isFinite(f.start) ? f.start : f.time ?? 0;
+      const e = Number.isFinite(f.end) ? f.end : f.time ?? 0;
+      return s <= nowMs && e >= startMs;
+    });
+    const red = within.filter((f) => f.level === "red").length;
+    const orange = within.filter((f) => f.level === "orange").length;
+    const green = within.filter((f) => f.level === "green").length;
+    const active = within.filter((f) => f.isCurrent).length;
+    return { total: within.length, red, orange, green, active };
+  }, [floods]);
+
   function sleep(ms) {
     return new Promise((r) => setTimeout(r, ms));
   }
@@ -465,72 +444,103 @@ function PageInner() {
     return () => setTourOn(false);
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    const token = ++tourTokenRef.current;
+useEffect(() => {
+  let cancelled = false;
+  const token = ++tourTokenRef.current;
 
-    async function run() {
-      const list = isQuake
-        ? [...displayedQuakes].sort((a, b) => b.mag - a.mag)
-        : [...displayedFloods];
+  function buildTourList() {
+    const nowMs = Date.now();
 
-      if (!list.length) {
-        toast({
-          title: "Nothing to tour",
-          description: "Try widening the time window.",
-          type: "info",
-          duration: 2200,
-        });
-        setTourOn(false);
-        return;
-      }
+    if (isQuake) {
+      const startMs = nowMs - 24 * 3600e3; // default EQ window = 24h
+      const src = Array.isArray(quakes) ? quakes : [];
+      const within = src.filter((q) => q.time >= startMs && q.time <= nowMs);
+      return within.sort((a, b) => b.mag - a.mag); // strongest first
+    } else {
+      const startMs = nowMs - 30 * 86400e3; // default Floods window = 30d
+      const src = Array.isArray(floods) ? floods : [];
+      const within = src.filter((f) => {
+        const s = Number.isFinite(f.start) ? f.start : (f.time ?? 0);
+        const e = Number.isFinite(f.end) ? f.end : (f.time ?? 0);
+        return s <= nowMs && e >= startMs; // interval overlap with last 30d
+      });
+      const prio = { red: 3, orange: 2, green: 1, "": 0, undefined: 0, null: 0 };
+      return within.sort((a, b) => {
+        const pa = prio[a.level] ?? 0;
+        const pb = prio[b.level] ?? 0;
+        if (pb !== pa) return pb - pa; // red → orange → green
+        return (b.end ?? b.time ?? 0) - (a.end ?? a.time ?? 0); // newer first
+      });
+    }
+  }
 
-      for (let i = 0; i < list.length; i++) {
-        if (!tourOn || cancelled || token !== tourTokenRef.current) break;
+  async function runOnce() {
+    const list = buildTourList();
 
-        const p = list[i];
-        const zoom = isQuake ? (p.mag >= 6 ? 8 : 7) : 10;
-
-        userMovedRef.current = false;
-        setSelected(isQuake ? p : null);
-        setFlyTo({ center: [p.lat, p.lon], zoom });
-
-        if (isQuake) {
-          const dur = Math.round(1600 + (p.mag || 4) * 420);
-          const intensity = Math.min(2, Math.max(0.6, (p.mag || 4) / 5.5));
-          setFxKind("earthquake");
-          setFxIntensity(intensity);
-          setFxDur(dur);
-          setFxTick((t) => t + 1); // <— restart FX
-          setFxShow(true);
-          await sleep(Math.min(dur + 350, 5000));
-          setFxShow(false);
-        } else {
-          const dur = 2500;
-          setFxKind("rain");
-          setFxIntensity(1);
-          setFxDur(dur);
-          setFxTick((t) => t + 1); // <— restart FX
-          setFxShow(true);
-          await sleep(dur);
-          setFxShow(false);
-        }
-
-        await sleep(300);
-      }
-
-      setFxShow(false);
+    if (!list.length) {
+      toast({
+        title: "Nothing to tour",
+        description: isQuake
+          ? "No earthquakes in the last 24 hours."
+          : "No floods in the last 30 days.",
+        type: "info",
+        duration: 2200,
+      });
       setTourOn(false);
+      return;
     }
 
-    if (tourOn) run();
+    for (let i = 0; i < list.length; i++) {
+      if (!tourOn || cancelled || token !== tourTokenRef.current) break;
 
-    return () => {
-      cancelled = true;
-    };
-  }, [tourOn, isQuake, displayedQuakes, displayedFloods, toast]);
+      const p = list[i];
+      const zoom = isQuake
+        ? (p.mag >= 6 ? 8 : 7)
+        : (p.level === "red" ? 8 : p.level === "orange" ? 9 : 10);
 
-  // random day helper
+      userMovedRef.current = false;
+      setSelected(isQuake ? p : null);
+      setFlyTo({ center: [p.lat, p.lon], zoom });
+
+      if (isQuake) {
+        const dur = Math.round(1600 + (p.mag || 4) * 420);
+        const intensity = Math.min(2, Math.max(0.6, (p.mag || 4) / 5.5));
+        setFxKind("earthquake");
+        setFxIntensity(intensity);
+        setFxDur(dur);
+        setFxTick((t) => t + 1);
+        setFxShow(true);
+        await new Promise((r) => setTimeout(r, Math.min(dur + 350, 5000)));
+        setFxShow(false);
+      } else {
+        const intensityByLevel = { red: 1.0, orange: 0.75, green: 0.45, "": 0.4 };
+        const dur = 2600;
+        setFxKind("rain");
+        setFxIntensity(intensityByLevel[p.level] ?? 0.4);
+        setFxDur(dur);
+        setFxTick((t) => t + 1);
+        setFxShow(true);
+        await new Promise((r) => setTimeout(r, dur));
+        setFxShow(false);
+      }
+
+      await new Promise((r) => setTimeout(r, 300));
+    }
+
+    setFxShow(false);
+    setTourOn(false);           // stop after one full pass
+    setSelected(null);
+    resetToDefaultView();       // revert map to default
+  }
+
+  if (tourOn) runOnce();
+
+  return () => {
+    cancelled = true;
+  };
+}, [tourOn, isQuake, quakes, floods, toast]);
+
+
   function pickRandomDay() {
     const start = new Date("2000-01-01T00:00:00Z").getTime();
     const end = new Date(Date.now() - 86400e3).getTime();
@@ -540,6 +550,14 @@ function PageInner() {
     setMode("historyDay");
     setLive(false);
     setScrubPct(100);
+  }
+
+  function endTourNow() {
+    tourTokenRef.current += 1;
+    setFxShow(false);
+    setTourOn(false);
+    setSelected(null);
+    resetToDefaultView();
   }
 
   return (
@@ -585,7 +603,7 @@ function PageInner() {
                     .slice(0, 16)}`
                 : ""}
             </div>
-            {isQuake && (
+            {isQuake ? (
               <div className="flex items-center gap-2">
                 <span className="badge" suppressHydrationWarning>
                   Last fetch: {mountedTime ? formatClock(mountedTime) : ""}
@@ -600,6 +618,18 @@ function PageInner() {
                   Avg mag: {kpi.avgMag ? kpi.avgMag.toFixed(2) : "—"}
                 </span>
               </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="badge" suppressHydrationWarning>
+                  Window: last 30 days
+                </span>
+                <span className="badge">Floods: {toKpi(floodKpi.total)}</span>
+                <span className="badge">
+                  Red: {floodKpi.red} • Orange: {floodKpi.orange} • Green:{" "}
+                  {floodKpi.green}
+                </span>
+                <span className="badge">Active now: {floodKpi.active}</span>
+              </div>
             )}
           </div>
         </div>
@@ -608,12 +638,25 @@ function PageInner() {
         </div>
       </div>
 
+      {tourOn && (
+        <div className="pointer-events-auto absolute left-4 top-28 z-[1200]">
+          <button
+            className="rounded-xl bg-white/90 hover:bg-white px-3 py-1.5 text-sm font-medium shadow"
+            onClick={endTourNow}
+          >
+            End Tour
+          </button>
+        </div>
+      )}
+
       <div className="pointer-events-auto absolute left-4 bottom-4 right-4 z-[1100]">
         <Controls
           hazard={isFlood ? "floods" : "earthquakes"}
           setHazard={(h) => {
             setHazard(h);
             setTourOn(false);
+            setSelected(null);
+            resetToDefaultView();
           }}
           mode={mode}
           setMode={(m) => {
@@ -639,9 +682,7 @@ function PageInner() {
               tourTokenRef.current += 1;
               setTourOn(true);
             } else {
-              tourTokenRef.current += 1;
-              setFxShow(false);
-              setTourOn(false);
+              endTourNow();
             }
           }}
           setFlyTo={setFlyTo}
