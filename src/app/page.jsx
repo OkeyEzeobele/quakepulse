@@ -7,8 +7,8 @@ import { fetchFloods } from "@/lib/floods";
 import { formatAgo, formatClock, mean, toKpi } from "@/lib/time";
 import Controls from "@/components/Controls";
 import Drawer from "@/components/Drawer";
+import FloodDrawer from "@/components/FloodDrawer";
 import Legend from "@/components/Legend";
-import FXOverlay from "@/components/FXOverlay";
 import { ToastProvider, useToast } from "@/lib/toast";
 import clsx from "classnames";
 import RainPortal from "@/components/RainPortal";
@@ -75,6 +75,11 @@ function PageInner() {
   useEffect(() => {
     resetToDefaultView();
   }, []);
+
+  useEffect(() => {
+    if (!tourOn) setSelected(null);
+  }, [tourOn]);
+
 
   useEffect(() => {
     setSelected(null);
@@ -363,6 +368,11 @@ function PageInner() {
               time,
               isCurrent: p.iscurrent === true || p.iscurrent === "true",
               country: p.country || p.iso3 || null,
+              links: {
+                report: p.url?.report || null,
+                details: p.url?.details || null,
+                geometry: p.url?.geometry || null,
+              },
             };
           })
           .filter(Boolean);
@@ -548,7 +558,7 @@ function PageInner() {
           : (p.level === "red" ? 1900 : p.level === "orange" ? 1800 : 1700);
 
         userMovedRef.current = false;
-        setSelected(isQuake ? p : null);
+        setSelected(p);
         setActiveId(p.id);
         setFlyTo({ center: [p.lat, p.lon], zoom, ms: moveMs });
         await sleep(moveMs + 280);
@@ -775,20 +785,35 @@ function PageInner() {
         />
       </div>
 
-      {isQuake && selected && (
+      {selected && (
         <div className="pointer-events-auto absolute right-4 top-24 w-96 max-w-[92vw] z-[1200]">
-          <Drawer
-            quake={selected}
-            onClose={() => setSelected(null)}
-            footer={
-              selected
-                ? `Occurred ${formatAgo(selected.time)} • Depth ${selected.depth?.toFixed?.(1) ?? "—"
-                } km • ${selected.lat?.toFixed?.(3)}, ${selected.lon?.toFixed?.(3)}`
-                : ""
-            }
-          />
+          {isQuake ? (
+            <Drawer
+              quake={selected}
+              onClose={() => setSelected(null)}
+              footer={
+                selected
+                  ? `Occurred ${formatAgo(selected.time)} • Depth ${selected.depth?.toFixed?.(1) ?? "—"
+                  } km • ${selected.lat?.toFixed?.(3)}, ${selected.lon?.toFixed?.(3)}`
+                  : ""
+              }
+            />
+          ) : (
+            <FloodDrawer
+              flood={selected}
+              onClose={() => setSelected(null)}
+              footer={
+                selected
+                  ? `From ${new Date(selected.start).toISOString().slice(0, 16)}Z to ${new Date(
+                    selected.end ?? selected.time
+                  ).toISOString().slice(0, 16)}Z • ${selected.lat?.toFixed?.(3)}, ${selected.lon?.toFixed?.(3)}`
+                  : ""
+              }
+            />
+          )}
         </div>
       )}
+
     </div>
   );
 }
