@@ -9,6 +9,7 @@ import {
 } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import { useEffect, useMemo } from "react";
+
 const LEVEL_COLOR = { green: "#22c55e", orange: "#f59e0b", red: "#ef4444" };
 
 function FlyTo({ flyTo }) {
@@ -21,7 +22,7 @@ function FlyTo({ flyTo }) {
       Number.isFinite(center[0]) &&
       Number.isFinite(center[1])
     ) {
-      map.flyTo(center, zoom ?? map.getZoom(), { duration: 1.1 });
+      map.flyTo(center, zoom ?? map.getZoom(), { duration: 1.4 });
     }
   }, [flyTo, map]);
   return null;
@@ -55,14 +56,16 @@ function magFill(m = 0) {
   if (m >= 4) return "rgba(234,179,8,0.55)";
   return "rgba(59,130,246,0.55)";
 }
-function magRadius(m = 0) {
+function magRadius(m = 0, active = false) {
   const mm = Math.max(0, m);
-  return Math.max(4, Math.min(24, 3 + mm * 3.2));
+  const base = Math.max(4, Math.min(24, 3 + mm * 3.2));
+  return active ? base + 4 : base;
 }
 
 export default function QuakeMap({
   quakes = [],
   floods = [],
+  activeId = null, // NEW: id to highlight (from tour)
   flyTo,
   onSelect,
   onMove,
@@ -87,51 +90,58 @@ export default function QuakeMap({
       <FlyTo flyTo={flyTo} />
       <BoundsHandler onMove={onMove} />
 
-      {eq.map((q) => (
-        <CircleMarker
-          key={`eq-${q.id}`}
-          center={[q.lat, q.lon]}
-          radius={magRadius(q.mag)}
-          pathOptions={{
-            color: magColor(q.mag),
-            weight: 1.5,
-            fillColor: magFill(q.mag),
-            fillOpacity: 0.7,
-          }}
-          eventHandlers={{ click: () => onSelect?.(q) }}
-        >
-          <Popup>
-            <div className="text-xs">
-              <div className="font-semibold">M{(q.mag ?? 0).toFixed(1)}</div>
-              <div>{q.place || "Unknown location"}</div>
-              <div>
-                {(q.lat ?? 0).toFixed(3)}, {(q.lon ?? 0).toFixed(3)}
-              </div>
-            </div>
-          </Popup>
-        </CircleMarker>
-      ))}
-
-      {fl.map((f) => {
-        const lvl = (f.level ?? f.alertlevel ?? "").toString().toLowerCase();
-        const color = LEVEL_COLOR[lvl] ?? "#0ea5e9";
+      {eq.map((q) => {
+        const active = activeId && activeId === q.id;
         return (
           <CircleMarker
-            key={`fl-${f.id ?? `${f.lat},${f.lon}`}`}
-            center={[f.lat, f.lon]}
-            radius={9}
+            key={`eq-${q.id}`}
+            center={[q.lat, q.lon]}
+            radius={magRadius(q.mag, active)}
             pathOptions={{
-              color,
-              weight: 1.6,
-              fillColor: color,
-              fillOpacity: 0.8,
+              color: active ? "#ffffff" : magColor(q.mag),
+              weight: active ? 3 : 1.5,
+              fillColor: active ? "#ffffff" : magFill(q.mag),
+              fillOpacity: active ? 0.25 : 0.7,
             }}
+            className={active ? "pulse" : ""}
+            eventHandlers={{ click: () => onSelect?.(q) }}
+          >
+            <Popup>
+              <div className="text-xs">
+                <div className="font-semibold">M{(q.mag ?? 0).toFixed(1)}</div>
+                <div>{q.place || "Unknown location"}</div>
+                <div>
+                  {(q.lat ?? 0).toFixed(3)}, {(q.lon ?? 0).toFixed(3)}
+                </div>
+              </div>
+            </Popup>
+          </CircleMarker>
+        );
+      })}
+
+      {fl.map((f) => {
+        const lvl = (f.level || "").toLowerCase();
+        const color = LEVEL_COLOR[lvl] || "rgba(14,165,233,0.95)";
+        const fill = LEVEL_COLOR[lvl] ? LEVEL_COLOR[lvl] + "88" : "rgba(14,165,233,0.55)";
+        const active = activeId && activeId === f.id;
+        return (
+          <CircleMarker
+            key={`fl-${f.id}`}
+            center={[f.lat, f.lon]}
+            radius={active ? 12 : 9}
+            pathOptions={{
+              color: active ? "#ffffff" : color,
+              weight: active ? 3 : 1.6,
+              fillColor: active ? "#ffffff" : fill,
+              fillOpacity: active ? 0.25 : 0.8,
+            }}
+            className={active ? "pulse" : ""}
             eventHandlers={{ click: () => onSelect?.(f) }}
           >
             <Popup>
               <div className="text-xs">
                 <div className="font-semibold">{f.name || "Flood event"}</div>
-                <div className="opacity-80 capitalize">{lvl || "—"}</div>
+                <div className="opacity-80 capitalize">{f.level || "—"}</div>
                 <div>
                   {(f.lat ?? 0).toFixed(3)}, {(f.lon ?? 0).toFixed(3)}
                 </div>

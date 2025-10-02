@@ -10,8 +10,11 @@ import Drawer from "@/components/Drawer";
 import Legend from "@/components/Legend";
 import FXOverlay from "@/components/FXOverlay";
 import { ToastProvider, useToast } from "@/lib/toast";
+import clsx from "classnames";
 
 const QuakeMap = dynamic(() => import("@/components/QuakeMap"), { ssr: false });
+
+const MAX_TOUR = 60;
 
 function PageInner() {
   const { toast } = useToast();
@@ -44,16 +47,18 @@ function PageInner() {
   const [fxTick, setFxTick] = useState(0);
 
   const [tourOn, setTourOn] = useState(false);
+  const [activeId, setActiveId] = useState(null);
 
   const seenRef = useRef(new Set());
   const userMovedRef = useRef(false);
   const tourTokenRef = useRef(0);
+  const tourListRef = useRef([]);
 
   const isFlood = hazard === "floods";
   const isQuake = hazard === "earthquakes";
 
   const DEFAULT_VIEW = { center: [20, 0], zoom: 2 };
-  const resetToDefaultView = () => setFlyTo(DEFAULT_VIEW);
+  const resetToDefaultView = () => setFlyTo({ ...DEFAULT_VIEW, ms: 1400 });
 
   useEffect(() => {
     setMountedTime(new Date());
@@ -67,14 +72,15 @@ function PageInner() {
 
   useEffect(() => {
     setSelected(null);
-    setTourOn(false);
+    setActiveId(null);
+    if (tourOn) setTourOn(false);
     userMovedRef.current = false;
     if (isFlood) setQuakes([]);
     else setFloods([]);
-  }, [hazard]);
+  }, [hazard]); // only on hazard change
 
   useEffect(() => {
-    setTourOn(false);
+    if (tourOn) setTourOn(false);
   }, [mode, historyDate, startISO, endISO, windowKey, magMin]);
 
   function handleMapMove() {
@@ -89,7 +95,8 @@ function PageInner() {
     return d;
   }
 
-  const now = Date.now();
+  // Make "now" stable (ticks once per minute) to avoid effects firing every render
+  const now = mountedTime ? mountedTime.getTime() : Date.now();
   const liveWindowMs = windowKey === "hour" ? 3600e3 : 86400e3;
 
   const { rangeStart, rangeEnd, rangeValidMs } = useMemo(() => {
@@ -111,23 +118,25 @@ function PageInner() {
 
   useEffect(() => {
     if (mode !== "customRange") {
-      setRangeError("");
+      if (rangeError !== "") setRangeError("");
       return;
     }
     if (!rangeStart || !rangeEnd) {
-      setRangeError("Select both start and end");
+      if (rangeError !== "Select both start and end") setRangeError("Select both start and end");
       return;
     }
     if (rangeValidMs < 10 * 60 * 1000) {
-      setRangeError("Range must be at least 10 minutes");
+      if (rangeError !== "Range must be at least 10 minutes")
+        setRangeError("Range must be at least 10 minutes");
       return;
     }
     if (rangeValidMs > 24 * 3600 * 1000) {
-      setRangeError("Range must be at most 24 hours");
+      if (rangeError !== "Range must be at most 24 hours")
+        setRangeError("Range must be at most 24 hours");
       return;
     }
-    setRangeError("");
-  }, [mode, rangeStart, rangeEnd, rangeValidMs]);
+    if (rangeError !== "") setRangeError("");
+  }, [mode, rangeStart, rangeEnd, rangeValidMs, rangeError]);
 
   const replayTs = useMemo(() => {
     if (!rangeStart || !rangeEnd) return now;
@@ -136,6 +145,7 @@ function PageInner() {
     return live ? endMs : startMs + (scrubPct / 100) * (endMs - startMs);
   }, [live, scrubPct, rangeStart, rangeEnd, now]);
 
+  // ---------- DATA: Earthquakes (live)
   useEffect(() => {
     let cancel = false;
     let timer;
@@ -189,6 +199,7 @@ function PageInner() {
     };
   }, [isQuake, mode, windowKey, toast]);
 
+  // ---------- DATA: Earthquakes (range)
   useEffect(() => {
     let cancel = false;
     async function loadEQRange() {
@@ -258,6 +269,7 @@ function PageInner() {
     };
   }, [isQuake, mode, historyDate, rangeStart, rangeEnd, rangeError, toast]);
 
+  // ---------- DATA: Floods
   useEffect(() => {
     let cancel = false;
     let timer;
@@ -277,7 +289,7 @@ function PageInner() {
       }
       const queryFrom = new Date(s.getTime() - 86400e3);
       const queryTo = new Date(e.getTime());
-      return { s, e, queryFrom, queryTo };
+      return { queryFrom, queryTo };
     }
 
     async function loadFloodsOnce() {
@@ -288,7 +300,6 @@ function PageInner() {
           fromISO: queryFrom.toISOString(),
           toISO: queryTo.toISOString(),
           pageSize: 200,
-          // noCache: true, // enable only when debugging
         });
         if (cancel) return;
 
@@ -385,6 +396,7 @@ function PageInner() {
     };
   }, [isFlood, mode, historyDate, startISO, endISO, toast]);
 
+  // ---------- Derived lists + KPIs
   const tmin = rangeStart?.getTime?.() ?? null;
   const tmax = replayTs;
 
@@ -436,6 +448,31 @@ function PageInner() {
     return { total: within.length, red, orange, green, active };
   }, [floods]);
 
+  const canTour = useMemo(() => {
+    if (isQuake) {
+      if (mode === "customRange")
+        return !!rangeStart && !!rangeEnd && !rangeError && displayedQuakes.length > 0;
+      if (mode === "historyDay")
+        return !!historyDate && displayedQuakes.length > 0;
+      return displayedQuakes.length > 0;
+    } else {
+      if (mode === "customRange")
+        return !!rangeStart && !!rangeEnd && !rangeError && displayedFloods.length > 0;
+      if (mode === "historyDay")
+        return !!historyDate && displayedFloods.length > 0;
+      return displayedFloods.length > 0;
+    }
+  }, [
+    isQuake,
+    mode,
+    rangeStart,
+    rangeEnd,
+    rangeError,
+    historyDate,
+    displayedQuakes,
+    displayedFloods,
+  ]);
+
   function sleep(ms) {
     return new Promise((r) => setTimeout(r, ms));
   }
@@ -444,105 +481,119 @@ function PageInner() {
     return () => setTourOn(false);
   }, []);
 
-useEffect(() => {
-  let cancelled = false;
-  const token = ++tourTokenRef.current;
+  // ---------- TOUR (snapshot list once; effect only depends on tourOn + hazard)
+  useEffect(() => {
+    let cancelled = false;
+    const token = ++tourTokenRef.current;
 
-  function buildTourList() {
-    const nowMs = Date.now();
+    if (!tourOn) return;
 
     if (isQuake) {
-      const startMs = nowMs - 24 * 3600e3; // default EQ window = 24h
-      const src = Array.isArray(quakes) ? quakes : [];
-      const within = src.filter((q) => q.time >= startMs && q.time <= nowMs);
-      return within.sort((a, b) => b.mag - a.mag); // strongest first
+      const src = Array.isArray(displayedQuakes) ? displayedQuakes : [];
+      tourListRef.current = [...src].sort((a, b) => b.mag - a.mag).slice(0, MAX_TOUR);
     } else {
-      const startMs = nowMs - 30 * 86400e3; // default Floods window = 30d
-      const src = Array.isArray(floods) ? floods : [];
-      const within = src.filter((f) => {
-        const s = Number.isFinite(f.start) ? f.start : (f.time ?? 0);
-        const e = Number.isFinite(f.end) ? f.end : (f.time ?? 0);
-        return s <= nowMs && e >= startMs; // interval overlap with last 30d
-      });
+      const src = Array.isArray(displayedFloods) ? displayedFloods : [];
       const prio = { red: 3, orange: 2, green: 1, "": 0, undefined: 0, null: 0 };
-      return within.sort((a, b) => {
-        const pa = prio[a.level] ?? 0;
-        const pb = prio[b.level] ?? 0;
-        if (pb !== pa) return pb - pa; // red → orange → green
-        return (b.end ?? b.time ?? 0) - (a.end ?? a.time ?? 0); // newer first
-      });
-    }
-  }
-
-  async function runOnce() {
-    const list = buildTourList();
-
-    if (!list.length) {
-      toast({
-        title: "Nothing to tour",
-        description: isQuake
-          ? "No earthquakes in the last 24 hours."
-          : "No floods in the last 30 days.",
-        type: "info",
-        duration: 2200,
-      });
-      setTourOn(false);
-      return;
+      tourListRef.current = [...src]
+        .sort((a, b) => {
+          const pa = prio[a.level] ?? 0;
+          const pb = prio[b.level] ?? 0;
+          if (pb !== pa) return pb - pa;
+          return (b.end ?? b.time ?? 0) - (a.end ?? a.time ?? 0);
+        })
+        .slice(0, MAX_TOUR);
     }
 
-    for (let i = 0; i < list.length; i++) {
-      if (!tourOn || cancelled || token !== tourTokenRef.current) break;
-
-      const p = list[i];
-      const zoom = isQuake
-        ? (p.mag >= 6 ? 8 : 7)
-        : (p.level === "red" ? 8 : p.level === "orange" ? 9 : 10);
-
-      userMovedRef.current = false;
-      setSelected(isQuake ? p : null);
-      setFlyTo({ center: [p.lat, p.lon], zoom });
-
-      if (isQuake) {
-        const dur = Math.round(1600 + (p.mag || 4) * 420);
-        const intensity = Math.min(2, Math.max(0.6, (p.mag || 4) / 5.5));
-        setFxKind("earthquake");
-        setFxIntensity(intensity);
-        setFxDur(dur);
-        setFxTick((t) => t + 1);
-        setFxShow(true);
-        await new Promise((r) => setTimeout(r, Math.min(dur + 350, 5000)));
-        setFxShow(false);
-      } else {
-        const intensityByLevel = { red: 1.0, orange: 0.75, green: 0.45, "": 0.4 };
-        const dur = 2600;
-        setFxKind("rain");
-        setFxIntensity(intensityByLevel[p.level] ?? 0.4);
-        setFxDur(dur);
-        setFxTick((t) => t + 1);
-        setFxShow(true);
-        await new Promise((r) => setTimeout(r, dur));
-        setFxShow(false);
+    async function runOnce() {
+      const list = tourListRef.current;
+      if (!list.length) {
+        toast({
+          title: "Nothing to tour",
+          description:
+            isQuake
+              ? (mode === "customRange" || mode === "historyDay")
+                ? "No earthquakes in the selected range."
+                : "No earthquakes in the live window."
+              : (mode === "customRange" || mode === "historyDay")
+                ? "No floods in the selected range."
+                : "No floods in the live window.",
+          type: "info",
+          duration: 2200,
+        });
+        setTourOn(false);
+        return;
       }
 
-      await new Promise((r) => setTimeout(r, 300));
+      await sleep(60);
+
+      for (let i = 0; i < list.length; i++) {
+        if (!tourOn || cancelled || token !== tourTokenRef.current) break;
+
+        const p = list[i];
+        if (!Number.isFinite(p?.lat) || !Number.isFinite(p?.lon)) continue;
+
+        const zoom = isQuake
+          ? p.mag >= 6
+            ? 8
+            : 7
+          : p.level === "red"
+          ? 8
+          : p.level === "orange"
+          ? 9
+          : 10;
+
+        const moveMs = isQuake
+          ? (p.mag >= 6 ? 2100 : 1900)
+          : (p.level === "red" ? 1900 : p.level === "orange" ? 1800 : 1700);
+
+        userMovedRef.current = false;
+        setSelected(isQuake ? p : null);
+        setActiveId(p.id);
+        setFlyTo({ center: [p.lat, p.lon], zoom, ms: moveMs });
+        await sleep(moveMs + 280);
+
+        if (isQuake) {
+          const base = Math.round(600 + Math.max(0, (p.mag ?? 0) - 3) * 350);
+          const dur = base + 1000;
+          const intensity = Math.min(1.35, Math.max(0.6, (p.mag ?? 0) / 5.5));
+
+          setFxKind("earthquake");
+          setFxIntensity(intensity);
+          setFxDur(dur);
+          setFxTick((t) => t + 1);
+          setFxShow(true);
+          await sleep(dur);
+          setFxShow(false);
+        } else {
+          const intensityByLevel = { red: 1.0, orange: 0.75, green: 0.45, "": 0.4 };
+          const dur = 2600;
+          setFxKind("rain");
+          setFxIntensity(intensityByLevel[p.level] ?? 0.4);
+          setFxDur(dur);
+          setFxTick((t) => t + 1);
+          setFxShow(true);
+          await sleep(dur);
+          setFxShow(false);
+        }
+
+        await sleep(700);
+      }
+
+      setActiveId(null);
+      setFxShow(false);
+      setTourOn(false);
+      resetToDefaultView();
     }
 
-    setFxShow(false);
-    setTourOn(false);           // stop after one full pass
-    setSelected(null);
-    resetToDefaultView();       // revert map to default
-  }
+    runOnce();
 
-  if (tourOn) runOnce();
-
-  return () => {
-    cancelled = true;
-  };
-}, [tourOn, isQuake, quakes, floods, toast]);
-
+    return () => {
+      cancelled = true;
+    };
+  }, [tourOn, isQuake]); // safe: doesn’t depend on changing lists
 
   function pickRandomDay() {
-    const start = new Date("2000-01-01T00:00:00Z").getTime();
+    const start = new Date("2015-01-01T00:00:00Z").getTime();
     const end = new Date(Date.now() - 86400e3).getTime();
     const d = new Date(start + Math.random() * (end - start));
     const iso = d.toISOString().slice(0, 10);
@@ -557,23 +608,33 @@ useEffect(() => {
     setFxShow(false);
     setTourOn(false);
     setSelected(null);
+    setActiveId(null);
     resetToDefaultView();
   }
 
   return (
-    <div
-      className={`h-screen w-screen overflow-hidden ${
-        fxKind === "earthquake" && fxShow ? "shake-root" : ""
-      }`}
-      style={{
-        "--shake-duration": `${fxDur}ms`,
-        "--shake-intensity": String(fxIntensity),
-      }}
-    >
-      <div className="absolute inset-0 z-0">
+    <div className="h-screen w-screen overflow-hidden">
+      <div
+        className={clsx(
+          "absolute inset-0 z-0",
+          fxKind === "earthquake" && fxShow && "map-tremor"
+        )}
+        style={{
+          "--shake-intensity": String(fxIntensity),
+          "--tremor-speed":
+            fxKind === "earthquake" && fxShow
+              ? fxIntensity >= 1.2
+                ? "85ms"
+                : fxIntensity >= 1.0
+                ? "95ms"
+                : "110ms"
+              : undefined,
+        }}
+      >
         <QuakeMap
           quakes={isQuake ? displayedQuakes : []}
           floods={isFlood ? displayedFloods : []}
+          activeId={activeId}
           flyTo={flyTo}
           onSelect={setSelected}
           onMove={handleMapMove}
@@ -585,7 +646,7 @@ useEffect(() => {
 
       <FXOverlay
         hazard={isFlood ? "floods" : "earthquakes"}
-        active={fxShow}
+        active={fxShow && isFlood}
         durationMs={fxDur}
         intensity={fxIntensity}
         k={fxTick}
@@ -625,8 +686,7 @@ useEffect(() => {
                 </span>
                 <span className="badge">Floods: {toKpi(floodKpi.total)}</span>
                 <span className="badge">
-                  Red: {floodKpi.red} • Orange: {floodKpi.orange} • Green:{" "}
-                  {floodKpi.green}
+                  Red: {floodKpi.red} • Orange: {floodKpi.orange} • Green: {floodKpi.green}
                 </span>
                 <span className="badge">Active now: {floodKpi.active}</span>
               </div>
@@ -654,19 +714,20 @@ useEffect(() => {
           hazard={isFlood ? "floods" : "earthquakes"}
           setHazard={(h) => {
             setHazard(h);
-            setTourOn(false);
+            if (tourOn) setTourOn(false);
             setSelected(null);
+            setActiveId(null);
             resetToDefaultView();
           }}
           mode={mode}
           setMode={(m) => {
             setMode(m);
-            setTourOn(false);
+            if (tourOn) setTourOn(false);
           }}
           windowKey={windowKey}
           setWindowKey={(w) => {
             setWindowKey(w);
-            setTourOn(false);
+            if (tourOn) setTourOn(false);
           }}
           magMin={magMin}
           setMagMin={(v) => {
@@ -690,23 +751,31 @@ useEffect(() => {
           historyDate={historyDate}
           setHistoryDate={(d) => {
             setHistoryDate(d);
-            setTourOn(false);
+            if (tourOn) setTourOn(false);
           }}
           onPickRandomDay={() => {
-            pickRandomDay();
-            setTourOn(false);
+            const start = new Date("2015-01-01T00:00:00Z").getTime();
+            const end = new Date(Date.now() - 86400e3).getTime();
+            const dd = new Date(start + Math.random() * (end - start));
+            const iso = dd.toISOString().slice(0, 10);
+            setHistoryDate(iso);
+            setMode("historyDay");
+            setLive(false);
+            setScrubPct(100);
+            if (tourOn) setTourOn(false);
           }}
           startISO={startISO}
           setStartISO={(v) => {
             setStartISO(v);
-            setTourOn(false);
+            if (tourOn) setTourOn(false);
           }}
-          endISO={endISO}
+  endISO={endISO}
           setEndISO={(v) => {
             setEndISO(v);
-            setTourOn(false);
+            if (tourOn) setTourOn(false);
           }}
           rangeError={rangeError}
+          canTour={canTour}
         />
       </div>
 
@@ -719,9 +788,7 @@ useEffect(() => {
               selected
                 ? `Occurred ${formatAgo(selected.time)} • Depth ${
                     selected.depth?.toFixed?.(1) ?? "—"
-                  } km • ${selected.lat?.toFixed?.(
-                    3
-                  )}, ${selected.lon?.toFixed?.(3)}`
+                  } km • ${selected.lat?.toFixed?.(3)}, ${selected.lon?.toFixed?.(3)}`
                 : ""
             }
           />

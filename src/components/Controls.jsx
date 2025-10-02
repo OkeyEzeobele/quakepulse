@@ -1,4 +1,3 @@
-// src/components/Controls.jsx
 "use client";
 
 import clsx from "classnames";
@@ -36,6 +35,7 @@ export default function Controls({
   endISO,
   setEndISO,
   rangeError,
+  canTour, // NEW: controls whether Play Tour is enabled
 }) {
   return (
     <div className="panel px-4 py-3">
@@ -50,6 +50,8 @@ export default function Controls({
           >
             Earthquakes
           </button>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={() => setHazard("floods")}
             className="badge"
@@ -64,19 +66,28 @@ export default function Controls({
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={() => setMode("live")}
-            className={clsx("badge", mode === "live" && "bg-white/20")}
+            className={clsx("badge", mode === "live" && "ring-2 ring-white/40")}
+            aria-pressed={mode === "live"}
           >
             Live
           </button>
           <button
             onClick={() => setMode("historyDay")}
-            className={clsx("badge", mode === "historyDay" && "bg-white/20")}
+            className={clsx(
+              "badge",
+              mode === "historyDay" && "ring-2 ring-white/40"
+            )}
+            aria-pressed={mode === "historyDay"}
           >
             History Day
           </button>
           <button
             onClick={() => setMode("customRange")}
-            className={clsx("badge", mode === "customRange" && "bg-white/20")}
+            className={clsx(
+              "badge",
+              mode === "customRange" && "ring-2 ring-white/40"
+            )}
+            aria-pressed={mode === "customRange"}
           >
             Custom Range
           </button>
@@ -86,13 +97,21 @@ export default function Controls({
           <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={() => setWindowKey("hour")}
-              className={clsx("badge", windowKey === "hour" && "bg-white/20")}
+              className={clsx(
+                "badge",
+                windowKey === "hour" && "ring-2 ring-white/40"
+              )}
+              aria-pressed={windowKey === "hour"}
             >
               Last 1h
             </button>
             <button
               onClick={() => setWindowKey("day")}
-              className={clsx("badge", windowKey === "day" && "bg-white/20")}
+              className={clsx(
+                "badge",
+                windowKey === "day" && "ring-2 ring-white/40"
+              )}
+              aria-pressed={windowKey === "day"}
             >
               Last 24h
             </button>
@@ -157,13 +176,15 @@ export default function Controls({
         <div className="flex items-center gap-2 grow basis-[420px] min-w-[320px]">
           <button
             onClick={() => setLive(true)}
-            className={clsx("badge", live && "bg-white/20")}
+            className={clsx("badge", live && "ring-2 ring-white/40")}
+            aria-pressed={live}
           >
             Live End
           </button>
           <button
             onClick={() => setLive(false)}
-            className={clsx("badge", !live && "bg-white/20")}
+            className={clsx("badge", !live && "ring-2 ring-white/40")}
+            aria-pressed={!live}
           >
             Replay
           </button>
@@ -195,7 +216,20 @@ export default function Controls({
         <div className="shrink-0">
           <button
             onClick={() => setTourOn((v) => !v)}
-            className={clsx("badge", tourOn && "bg-white/20")}
+            disabled={!canTour}
+            aria-disabled={!canTour}
+            title={
+              canTour
+                ? tourOn
+                  ? "Stop tour"
+                  : "Play tour"
+                : "Select a valid time range (and ensure there are events) to start the tour"
+            }
+            className={clsx(
+              "badge",
+              tourOn && "ring-2 ring-white/40",
+              !canTour && "opacity-40 pointer-events-none"
+            )}
           >
             {tourOn ? "Stop Tour" : "Play Tour"}
           </button>
