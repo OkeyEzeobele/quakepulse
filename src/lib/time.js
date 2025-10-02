@@ -35,3 +35,18 @@ export function formatRangeLabel(now, pct) {
   const t = new Date(start.getTime() + (pct / 100) * 24 * 3600e3);
   return `${CLOCK_FMT.format(start)} → ${CLOCK_FMT.format(t)}`;
 }
+
+export function defaultFloodWindow() {
+  const now = new Date();
+  const to = new Date(Date.UTC(
+    now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()
+  ));
+  const from = new Date(to);
+  from.setUTCDate(from.getUTCDate() - 30);
+  return {
+    fromISO: from.toISOString(),
+    toISO: to.toISOString(),
+  };
+}
+
+

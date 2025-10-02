@@ -1,6 +1,19 @@
+// src/components/Legend.jsx
 "use client";
 
-export default function Legend() {
+export default function Legend({ hazard = "earthquakes" }) {
+  if (hazard === "floods") {
+    return (
+      <div className="text-xs">
+        <div className="mb-2 font-semibold">Flood alert level</div>
+        <div className="flex items-center gap-3">
+          <Swatch c="#22c55e" label="Green" />
+          <Swatch c="#f59e0b" label="Orange" />
+          <Swatch c="#ef4444" label="Red" />
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="text-xs">
       <div className="mb-2 font-semibold">Magnitude</div>
