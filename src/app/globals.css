@@ -12,6 +12,7 @@ body {
   @apply bg-neutral-950 text-neutral-100;
 }
 
+/* Leaflet base */
 .leaflet-container {
   background: #0a0a0a;
 }
@@ -19,6 +20,7 @@ body {
   display: none !important;
 }
 
+/* Ping pulse (for markers etc.) */
 .pulse {
   animation: pulse 1.8s ease-out 1;
 }
@@ -37,6 +39,7 @@ body {
   }
 }
 
+/* Badges + active variants */
 .badge {
   @apply inline-flex h-9 items-center text-xs font-medium px-2.5 rounded-md
          text-neutral-100/95 border border-white/20 bg-neutral-900/80;
@@ -50,15 +53,16 @@ body {
   box-shadow: inset 0 0 0 2px rgba(14, 165, 233, 0.35);
 }
 
+/* Panels */
 .panel {
   @apply rounded-2xl border border-white/20 bg-neutral-900/80
          shadow-glow backdrop-blur-md max-w-full overflow-hidden;
 }
 
+/* Range slider (centered thumb) */
 .range {
   --range-track-h: 12px;
   --range-thumb: 16px;
-
   @apply align-middle w-64 appearance-none rounded-full outline-none;
   height: var(--range-track-h);
   background: rgba(255, 255, 255, 0.15);
@@ -108,10 +112,12 @@ body {
   border: none;
 }
 
+/* Inputs */
 .input {
   @apply h-9 px-3 rounded-md border border-white/20 bg-neutral-900/80 text-sm text-neutral-100;
 }
 
+/* Earthquake screen shake (not used when map-only tremor is active) */
 .shake-root {
   animation: quakeScreen var(--shake-duration, 900ms) ease-in-out 1;
   transform-origin: 50% 50%;
@@ -189,6 +195,7 @@ body {
   }
 }
 
+/* Map-only tremor used during quake FX */
 .map-tremor {
   --tremor-speed: 100ms;
   animation: mapTremor var(--tremor-speed) linear infinite;
@@ -242,196 +249,28 @@ body {
   }
 }
 
-.fx-rain {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 1200;
-  overflow: hidden;
+/* React Rain Animation overlay — placed under Leaflet markers, above tiles */
+#rain-root {
+  position: fixed !important;
+  inset: 0 !important;
+  pointer-events: none !important;
+  z-index: 500 !important; /* tiles ~200, markers ~600 */
 }
-.fx-rain-layer,
-.fx-rain-mist {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
+#rain-root .rain {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  pointer-events: none !important;
 }
-.fx-rain-layer {
-  background-image: linear-gradient(
-      transparent 0%,
-      rgba(255, 255, 255, 0.06) 2%,
-      transparent 3%
-    ),
-    linear-gradient(
-      transparent 0%,
-      rgba(255, 255, 255, 0.05) 1.5%,
-      transparent 3%
-    );
-  background-size: 2px 12px, 1px 8px;
-  animation: rainFall 900ms linear infinite;
-  opacity: 0.7;
-}
-.fx-rain-mist {
-  background: radial-gradient(
-    ellipse at bottom,
-    rgba(150, 180, 255, 0.15) 0%,
-    rgba(150, 180, 255, 0.05) 35%,
-    transparent 70%
-  );
-  animation: rainDrift 2400ms ease-in-out infinite alternate;
-  mix-blend-mode: screen;
-}
-@keyframes rainFall {
-  from {
-    background-position: 0 -24px, 0 -16px;
-  }
-  to {
-    background-position: 0 0, 0 0;
-  }
-}
-
-.fx-shake {
-  animation: fx-shake 0.9s ease-in-out;
-}
-@keyframes fx-shake {
-  0% {
-    transform: translate(0, 0) rotate(0deg);
-  }
-  15% {
-    transform: translate(-2px, 1px) rotate(-0.4deg);
-  }
-  30% {
-    transform: translate(2px, -2px) rotate(0.3deg);
-  }
-  45% {
-    transform: translate(-1px, 2px) rotate(-0.2deg);
-  }
-  60% {
-    transform: translate(1px, -1px) rotate(0.2deg);
-  }
-  75% {
-    transform: translate(-1px, 1px) rotate(0.1deg);
-  }
-  100% {
-    transform: translate(0, 0) rotate(0deg);
-  }
-}
-
-.fx-water,
-.fx-water-soft {
-  --w1: rgba(59, 130, 246, 0.25);
-  --w2: rgba(14, 165, 233, 0.18);
-  --w3: rgba(14, 165, 233, 0.1);
-  background: radial-gradient(
-      120% 60% at 50% 120%,
-      transparent 55%,
-      var(--w3) 60%,
-      transparent 70%
-    ),
-    radial-gradient(
-      120% 60% at 50% 120%,
-      transparent 40%,
-      var(--w2) 52%,
-      transparent 62%
-    ),
-    radial-gradient(
-      120% 60% at 50% 120%,
-      transparent 25%,
-      var(--w1) 44%,
-      transparent 56%
-    );
-  filter: blur(0.5px);
-}
-.fx-water {
-  animation: fx-water 2.4s ease-in-out infinite;
-}
-.fx-water-soft {
-  animation: fx-water 6s ease-in-out infinite;
-  opacity: 0.65;
-}
-@keyframes fx-water {
-  0%,
-  100% {
-    transform: translateY(0px);
-  }
-  50% {
-    transform: translateY(4px) scaleX(1.01);
-  }
-}
-
-.fx-raindrops {
-  position: absolute;
-  inset: 0;
-  background-image: repeating-linear-gradient(
-    to bottom-right,
-    rgba(255, 255, 255, 0) 0px,
-    rgba(255, 255, 255, 0) 10px,
-    rgba(255, 255, 255, 0.1) 11px,
-    rgba(255, 255, 255, 0.1) 12px,
-    rgba(255, 255, 255, 0) 13px
-  );
-  background-size: 12px 24px;
-  animation: fx-rain 1.4s linear infinite;
-}
-@keyframes fx-rain {
-  0% {
-    transform: translate3d(0, -10%, 0);
-  }
-  100% {
-    transform: translate3d(0, 10%, 0);
-  }
-}
-
-.fx-heat {
-  background: radial-gradient(
-    120% 120% at 50% 50%,
-    rgba(255, 160, 0, 0.08),
-    rgba(0, 0, 0, 0) 60%
-  );
-  mix-blend-mode: screen;
-  animation: fx-heat 1.2s ease-in-out infinite;
-}
-@keyframes fx-heat {
-  0%,
-  100% {
-    filter: blur(0.5px);
-    transform: scale(1);
-    opacity: 0.35;
-  }
-  50% {
-    filter: blur(1.2px);
-    transform: scale(1.01);
-    opacity: 0.55;
-  }
-}
-
-.fx-flash {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 1300;
-  background: radial-gradient(
-    ellipse at center,
-    rgba(255, 255, 255, 0.18),
-    rgba(255, 255, 255, 0) 60%
-  );
-  animation: fxFlash 420ms ease-out 1;
-  mix-blend-mode: screen;
-}
-@keyframes fxFlash {
-  0% {
-    opacity: 0;
-  }
-  12% {
-    opacity: 0.55;
-  }
-  100% {
-    opacity: 0;
-  }
-}
-
-.fx-rain-layer {
-  opacity: 0.9;
-}
-.fx-rain-mist {
-  opacity: 0.6;
+#rain-root .drop {
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(170, 200, 255, 0.95) 100%
+  ) !important;
+  width: 2px !important;
+  height: 18px !important;
+  opacity: 0.95 !important;
+  filter: drop-shadow(0 0 2px rgba(170, 200, 255, 0.55)) !important;
 }

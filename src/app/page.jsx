@@ -11,12 +11,16 @@ import Legend from "@/components/Legend";
 import FXOverlay from "@/components/FXOverlay";
 import { ToastProvider, useToast } from "@/lib/toast";
 import clsx from "classnames";
+import RainPortal from "@/components/RainPortal";
+
 
 const QuakeMap = dynamic(() => import("@/components/QuakeMap"), { ssr: false });
 
 const MAX_TOUR = 60;
 
 function PageInner() {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
   const { toast } = useToast();
 
   const [hazard, setHazard] = useState("earthquakes");
@@ -49,6 +53,8 @@ function PageInner() {
   const [tourOn, setTourOn] = useState(false);
   const [activeId, setActiveId] = useState(null);
 
+  const [floodLevel, setFloodLevel] = useState("");
+
   const seenRef = useRef(new Set());
   const userMovedRef = useRef(false);
   const tourTokenRef = useRef(0);
@@ -77,7 +83,7 @@ function PageInner() {
     userMovedRef.current = false;
     if (isFlood) setQuakes([]);
     else setFloods([]);
-  }, [hazard]); // only on hazard change
+  }, [hazard]);
 
   useEffect(() => {
     if (tourOn) setTourOn(false);
@@ -95,7 +101,6 @@ function PageInner() {
     return d;
   }
 
-  // Make "now" stable (ticks once per minute) to avoid effects firing every render
   const now = mountedTime ? mountedTime.getTime() : Date.now();
   const liveWindowMs = windowKey === "hour" ? 3600e3 : 86400e3;
 
@@ -145,7 +150,6 @@ function PageInner() {
     return live ? endMs : startMs + (scrubPct / 100) * (endMs - startMs);
   }, [live, scrubPct, rangeStart, rangeEnd, now]);
 
-  // ---------- DATA: Earthquakes (live)
   useEffect(() => {
     let cancel = false;
     let timer;
@@ -199,7 +203,6 @@ function PageInner() {
     };
   }, [isQuake, mode, windowKey, toast]);
 
-  // ---------- DATA: Earthquakes (range)
   useEffect(() => {
     let cancel = false;
     async function loadEQRange() {
@@ -269,7 +272,6 @@ function PageInner() {
     };
   }, [isQuake, mode, historyDate, rangeStart, rangeEnd, rangeError, toast]);
 
-  // ---------- DATA: Floods
   useEffect(() => {
     let cancel = false;
     let timer;
@@ -329,7 +331,7 @@ function PageInner() {
           try {
             const flat = c.flat(2).filter(Number.isFinite);
             if (flat.length >= 2) return [Number(flat[0]), Number(flat[1])];
-          } catch {}
+          } catch { }
           return [NaN, NaN];
         }
 
@@ -396,7 +398,6 @@ function PageInner() {
     };
   }, [isFlood, mode, historyDate, startISO, endISO, toast]);
 
-  // ---------- Derived lists + KPIs
   const tmin = rangeStart?.getTime?.() ?? null;
   const tmax = replayTs;
 
@@ -481,7 +482,6 @@ function PageInner() {
     return () => setTourOn(false);
   }, []);
 
-  // ---------- TOUR (snapshot list once; effect only depends on tourOn + hazard)
   useEffect(() => {
     let cancelled = false;
     const token = ++tourTokenRef.current;
@@ -537,10 +537,10 @@ function PageInner() {
             ? 8
             : 7
           : p.level === "red"
-          ? 8
-          : p.level === "orange"
-          ? 9
-          : 10;
+            ? 8
+            : p.level === "orange"
+              ? 9
+              : 10;
 
         const moveMs = isQuake
           ? (p.mag >= 6 ? 2100 : 1900)
@@ -568,6 +568,7 @@ function PageInner() {
           const intensityByLevel = { red: 1.0, orange: 0.75, green: 0.45, "": 0.4 };
           const dur = 2600;
           setFxKind("rain");
+          setFloodLevel(p.level || "");
           setFxIntensity(intensityByLevel[p.level] ?? 0.4);
           setFxDur(dur);
           setFxTick((t) => t + 1);
@@ -590,7 +591,7 @@ function PageInner() {
     return () => {
       cancelled = true;
     };
-  }, [tourOn, isQuake]); // safe: doesn’t depend on changing lists
+  }, [tourOn, isQuake]);
 
   function pickRandomDay() {
     const start = new Date("2015-01-01T00:00:00Z").getTime();
@@ -626,8 +627,8 @@ function PageInner() {
               ? fxIntensity >= 1.2
                 ? "85ms"
                 : fxIntensity >= 1.0
-                ? "95ms"
-                : "110ms"
+                  ? "95ms"
+                  : "110ms"
               : undefined,
         }}
       >
@@ -640,17 +641,11 @@ function PageInner() {
           onMove={handleMapMove}
         />
       </div>
-
+      {isFlood && tourOn ? (
+        <RainPortal active={true} intensity={fxIntensity || 1} />
+      ) : null}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-28 z-[1000] bg-gradient-to-b from-black/40 to-transparent" />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 z-[1000] bg-gradient-to-t from-black/40 to-transparent" />
-
-      <FXOverlay
-        hazard={isFlood ? "floods" : "earthquakes"}
-        active={fxShow && isFlood}
-        durationMs={fxDur}
-        intensity={fxIntensity}
-        k={fxTick}
-      />
 
       <div className="pointer-events-none absolute left-4 right-4 top-4 flex gap-4 z-[1100]">
         <div className="pointer-events-auto panel flex-1 p-3">
@@ -660,8 +655,8 @@ function PageInner() {
               {mode === "historyDay" && historyDate ? ` • ${historyDate}` : ""}
               {mode === "customRange" && rangeStart && rangeEnd
                 ? ` • ${rangeStart.toISOString().slice(0, 16)} → ${rangeEnd
-                    .toISOString()
-                    .slice(0, 16)}`
+                  .toISOString()
+                  .slice(0, 16)}`
                 : ""}
             </div>
             {isQuake ? (
@@ -769,7 +764,7 @@ function PageInner() {
             setStartISO(v);
             if (tourOn) setTourOn(false);
           }}
-  endISO={endISO}
+          endISO={endISO}
           setEndISO={(v) => {
             setEndISO(v);
             if (tourOn) setTourOn(false);
@@ -786,9 +781,8 @@ function PageInner() {
             onClose={() => setSelected(null)}
             footer={
               selected
-                ? `Occurred ${formatAgo(selected.time)} • Depth ${
-                    selected.depth?.toFixed?.(1) ?? "—"
-                  } km • ${selected.lat?.toFixed?.(3)}, ${selected.lon?.toFixed?.(3)}`
+                ? `Occurred ${formatAgo(selected.time)} • Depth ${selected.depth?.toFixed?.(1) ?? "—"
+                } km • ${selected.lat?.toFixed?.(3)}, ${selected.lon?.toFixed?.(3)}`
                 : ""
             }
           />
