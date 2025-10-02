@@ -641,7 +641,7 @@ useEffect(() => {
       {tourOn && (
         <div className="pointer-events-auto absolute left-4 top-28 z-[1200]">
           <button
-            className="rounded-xl bg-white/90 hover:bg-white px-3 py-1.5 text-sm font-medium shadow"
+            className="rounded-xl bg-gray-800 hover:bg-white px-3 py-1.5 text-sm font-medium shadow"
             onClick={endTourNow}
           >
             End Tour
